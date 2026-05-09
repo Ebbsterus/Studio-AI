@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
-const OLLAMA_HOST = process.env.OLLAMA_HOST || "192.168.50.161"
+const rawHost = process.env.OLLAMA_HOST || "192.168.50.161"
+const OLLAMA_HOST = rawHost.includes(":") ? rawHost.split(":")[0] : rawHost
 const OLLAMA_PORT = process.env.OLLAMA_PORT || "11434"
 const MODEL = process.env.OLLAMA_MODEL || "studio-ai"
 
