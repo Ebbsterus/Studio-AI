@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
+import { StudioAIChat } from '@/components/chat/studio-ai-chat'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -45,6 +46,7 @@ export default function RootLayout({
       </head>
       <body className="font-sans antialiased">
         {children}
+        <StudioAIChat />
         <Analytics />
       </body>
     </html>
