@@ -6,6 +6,8 @@ import Image from "next/image"
 import { Header } from "@/components/header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 import { Upload, X, Check, ImageIcon, Loader2 } from "lucide-react"
 
 interface UploadedFile {
@@ -13,12 +15,13 @@ interface UploadedFile {
   file: File
   preview: string
   uploaded?: boolean
-  pathname?: string
+  storage_path?: string
 }
 
 export default function UploadPage() {
   const router = useRouter()
   const [files, setFiles] = useState<UploadedFile[]>([])
+  const [gender, setGender] = useState<string>("auto")
   const [isDragging, setIsDragging] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -79,6 +82,7 @@ export default function UploadPage() {
       const uploadPromises = files.map(async (uploadedFile) => {
         const formData = new FormData()
         formData.append("file", uploadedFile.file)
+        formData.append("gender", gender === "auto" ? "" : gender)
         
         const response = await fetch("/api/upload", {
           method: "POST",
@@ -212,6 +216,37 @@ export default function UploadPage() {
                     <ImageIcon className="h-8 w-8 text-muted-foreground" />
                   </label>
                 )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Gender selector */}
+        {files.length > 0 && (
+          <Card className="mb-8 border-border bg-card">
+            <CardHeader>
+              <CardTitle className="text-lg">Photo Settings</CardTitle>
+              <CardDescription>
+                Help us generate better headshots by selecting your gender
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="gender">Gender</Label>
+                <Select value={gender} onValueChange={setGender}>
+                  <SelectTrigger id="gender" className="w-full sm:w-[240px]">
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">Auto-detect</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="other">Other / Prefer not to say</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  This helps our AI generate headshots with the correct body type and clothing fit.
+                </p>
               </div>
             </CardContent>
           </Card>

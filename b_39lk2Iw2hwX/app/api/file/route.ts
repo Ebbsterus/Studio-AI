@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { get } from "@vercel/blob"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function GET(request: NextRequest) {
   try {
@@ -17,35 +17,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Missing pathname" }, { status: 400 })
     }
 
-    // Verify user owns this file (check if pathname contains user id)
-    if (!pathname.includes(user.id)) {
+    // Verify user owns this file
+    if (!pathname.startsWith(`${user.id}/`)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const result = await get(pathname, {
-      access: "private",
-      ifNoneMatch: request.headers.get("if-none-match") ?? undefined,
-    })
+    const admin = createAdminClient()
+    const { data: blob, error } = await admin.storage
+      .from("headshots")
+      .download(pathname)
 
-    if (!result) {
+    if (error || !blob) {
       return new NextResponse("Not found", { status: 404 })
     }
 
-    // Blob hasn't changed — tell the browser to use its cached copy
-    if (result.statusCode === 304) {
-      return new NextResponse(null, {
-        status: 304,
-        headers: {
-          ETag: result.blob.etag,
-          "Cache-Control": "private, no-cache",
-        },
-      })
-    }
+    const arrayBuffer = await blob.arrayBuffer()
 
-    return new NextResponse(result.stream, {
+    return new NextResponse(arrayBuffer, {
       headers: {
-        "Content-Type": result.blob.contentType,
-        ETag: result.blob.etag,
+        "Content-Type": blob.type || "image/png",
         "Cache-Control": "private, no-cache",
       },
     })

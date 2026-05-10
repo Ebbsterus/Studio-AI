@@ -1,6 +1,6 @@
-import { put } from "@vercel/blob"
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const file = formData.get("file") as File
     const orderId = formData.get("orderId") as string | null
+    const gender = formData.get("gender") as string | null
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
@@ -36,11 +37,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Upload to Vercel Blob
-    const filename = `uploads/${user.id}/${Date.now()}-${file.name}`
-    const blob = await put(filename, file, {
-      access: "private",
-    })
+    // Upload to Supabase Storage
+    const storagePath = `${user.id}/${Date.now()}-${file.name}`
+    const admin = createAdminClient()
+    const { data: uploadData, error: uploadError } = await admin.storage
+      .from("uploads")
+      .upload(storagePath, file, {
+        contentType: file.type,
+        upsert: false,
+      })
+
+    if (uploadError) {
+      console.error("Storage upload error:", uploadError)
+      return NextResponse.json({ error: "Failed to upload file" }, { status: 500 })
+    }
 
     // Save to database
     const { data: upload, error: dbError } = await supabase
@@ -48,8 +58,9 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         order_id: orderId || null,
-        file_path: blob.pathname,
-        status: "uploaded",
+        storage_path: storagePath,
+        original_filename: file.name,
+        gender: gender || null,
       })
       .select()
       .single()
@@ -61,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       id: upload.id,
-      pathname: blob.pathname,
+      storage_path: storagePath,
     })
   } catch (error) {
     console.error("Upload error:", error)

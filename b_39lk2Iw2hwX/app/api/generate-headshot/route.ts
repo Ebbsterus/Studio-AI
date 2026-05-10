@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import * as fal from "@fal-ai/serverless-client"
-import { put } from "@vercel/blob"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 // Configure fal client
 fal.config({
@@ -77,15 +77,23 @@ export async function POST(request: NextRequest) {
       throw new Error("No image generated")
     }
 
-    // Download and store in Vercel Blob
+    // Download generated image
     const imageResponse = await fetch(generatedImageUrl)
     const imageBuffer = await imageResponse.arrayBuffer()
-    const filename = `headshots/${user.id}/${orderId}/${Date.now()}.jpg`
+    const storagePath = `${user.id}/${orderId}/${Date.now()}.jpg`
 
-    const blob = await put(filename, imageBuffer, {
-      access: "private",
-      contentType: "image/jpeg",
-    })
+    // Upload to Supabase Storage
+    const admin = createAdminClient()
+    const { data: uploadData, error: uploadError } = await admin.storage
+      .from("headshots")
+      .upload(storagePath, imageBuffer, {
+        contentType: "image/jpeg",
+        upsert: false,
+      })
+
+    if (uploadError) {
+      throw new Error("Failed to upload result to storage")
+    }
 
     // Save headshot to database
     const { data: headshot, error: headshotError } = await supabase
@@ -93,7 +101,8 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         order_id: orderId,
-        image_url: blob.pathname,
+        storage_path: storagePath,
+        style,
         status: "completed",
       })
       .select()
@@ -106,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       id: headshot.id,
-      pathname: blob.pathname,
+      storage_path: storagePath,
     })
   } catch (error) {
     console.error("Error generating headshot:", error)

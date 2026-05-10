@@ -15,10 +15,10 @@ const demoOrders = [
 ]
 
 const demoHeadshots = [
-  { id: "1", image_url: "/images/after-female.jpg", status: "completed" },
-  { id: "2", image_url: "/images/after-male.jpg", status: "completed" },
-  { id: "3", image_url: null, status: "processing" },
-  { id: "4", image_url: null, status: "processing" },
+  { id: "1", storage_path: "/images/after-female.jpg", status: "completed" },
+  { id: "2", storage_path: "/images/after-male.jpg", status: "completed" },
+  { id: "3", storage_path: null, status: "processing" },
+  { id: "4", storage_path: null, status: "processing" },
 ]
 
 export default function PreviewDashboardPage() {
@@ -118,10 +118,10 @@ export default function PreviewDashboardPage() {
                       key={headshot.id}
                       className="group relative aspect-[3/4] overflow-hidden rounded-lg bg-muted"
                     >
-                      {headshot.image_url ? (
+                      {headshot.storage_path ? (
                         <>
                           <img
-                            src={headshot.image_url}
+                            src={headshot.storage_path}
                             alt="AI Headshot"
                             className="h-full w-full object-cover"
                           />

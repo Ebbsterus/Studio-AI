@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
   plan_id TEXT NOT NULL,
   plan_name TEXT NOT NULL,
   headshot_count INTEGER NOT NULL,
-  amount_cents INTEGER NOT NULL,
+  price_cents INTEGER NOT NULL,
   stripe_session_id TEXT,
   status TEXT DEFAULT 'pending',
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -29,6 +29,8 @@ CREATE TABLE IF NOT EXISTS public.photo_uploads (
   order_id UUID REFERENCES public.orders(id) ON DELETE CASCADE,
   storage_path TEXT NOT NULL,
   original_filename TEXT,
+  gender TEXT,
+  status TEXT DEFAULT 'uploaded',
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

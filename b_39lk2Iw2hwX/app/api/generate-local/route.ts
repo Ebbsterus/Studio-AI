@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
-import { head } from "@vercel/blob"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { exec } from "child_process"
 import { promisify } from "util"
 import fs from "fs"
@@ -16,13 +16,14 @@ const SSH_KEY = process.env.SSH_KEY_PATH || "C:\\Users\\Ebrahim Hoosien\\AppData
 const SPARK_INPUT_DIR = "/home/ebbsterus/ComfyUI/input"
 const SPARK_OUTPUT_DIR = "/home/ebbsterus/ComfyUI/output"
 
-const STYLE_PROMPTS: Record<string, string> = {
-  professional:
-    "professional corporate headshot, studio lighting, neutral gray background, sharp focus, business attire, confident expression, photorealistic, 8k quality",
-  creative:
-    "creative professional headshot, artistic lighting, modern background, stylish appearance, confident pose, photorealistic, high quality portrait",
-  casual:
-    "casual professional headshot, natural lighting, soft background blur, approachable expression, smart casual attire, warm tones, photorealistic",
+function buildPrompt(style: string, gender?: string | null): string {
+  const genderTerm = gender === "female" ? "of a woman" : gender === "male" ? "of a man" : ""
+  const basePrompts: Record<string, string> = {
+    professional: `professional corporate headshot ${genderTerm}, studio lighting, neutral gray background, sharp focus, business attire, confident expression, photorealistic, 8k quality`,
+    creative: `creative professional headshot ${genderTerm}, artistic lighting, modern background, stylish appearance, confident pose, photorealistic, high quality portrait`,
+    casual: `casual professional headshot ${genderTerm}, natural lighting, soft background blur, approachable expression, smart casual attire, warm tones, photorealistic`,
+  }
+  return basePrompts[style] || basePrompts.professional
 }
 
 async function scpToSpark(localPath: string, remoteFilename: string) {
@@ -120,14 +121,18 @@ export async function POST(request: NextRequest) {
     // Use the most recent upload
     const bestPhoto = uploads[0]
 
-    // Download photo from Vercel Blob to temp file
-    const blobInfo = await head(bestPhoto.file_path)
-    const photoRes = await fetch(blobInfo.url)
-    if (!photoRes.ok) {
+    // Download photo from Supabase Storage to temp file
+    const admin = createAdminClient()
+    const { data: photoBlob, error: photoError } = await admin.storage
+      .from("uploads")
+      .download(bestPhoto.storage_path)
+
+    if (photoError || !photoBlob) {
       throw new Error("Failed to download photo from storage")
     }
-    const photoBuffer = Buffer.from(await photoRes.arrayBuffer())
-    const photoExt = path.extname(bestPhoto.file_path) || ".png"
+
+    const photoBuffer = Buffer.from(await photoBlob.arrayBuffer())
+    const photoExt = path.extname(bestPhoto.storage_path) || ".png"
     const localPhotoName = `studioai_${user.id}_${orderId}${photoExt}`
     const localPhotoPath = path.join(os.tmpdir(), localPhotoName)
     fs.writeFileSync(localPhotoPath, photoBuffer)
@@ -140,12 +145,17 @@ export async function POST(request: NextRequest) {
     const workflowPath = path.join(process.cwd(), "resources", "workflows", "headshot-reactor.json")
     const workflowTemplate = JSON.parse(fs.readFileSync(workflowPath, "utf-8"))
 
-    // Inject prompt
-    const prompt = STYLE_PROMPTS[style] || STYLE_PROMPTS.professional
+    // Inject prompt with gender awareness
+    const prompt = buildPrompt(style, bestPhoto.gender)
     workflowTemplate["2"].inputs.text = prompt
 
     // Inject user photo filename
     workflowTemplate["7"].inputs.image = localPhotoName
+
+    // Set ReActor gender detection
+    if (bestPhoto.gender === "female" || bestPhoto.gender === "male") {
+      workflowTemplate["8"].inputs.detect_gender_source = bestPhoto.gender
+    }
 
     // Randomize seed
     workflowTemplate["5"].inputs.seed = Math.floor(Math.random() * 2147483647)
@@ -168,14 +178,19 @@ export async function POST(request: NextRequest) {
     await scpFromSpark(outputFilename, localOutputPath)
     tempFiles.push(localOutputPath)
 
-    // Upload result to Vercel Blob
-    const outputBlobName = `headshots/${user.id}/${orderId}/${Date.now()}-${style}.png`
+    // Upload result to Supabase Storage
+    const outputStoragePath = `${user.id}/${orderId}/${Date.now()}-${style}.png`
     const outputBuffer = fs.readFileSync(localOutputPath)
-    const { put } = await import("@vercel/blob")
-    const outputBlob = await put(outputBlobName, outputBuffer, {
-      access: "private",
-      contentType: "image/png",
-    })
+    const { data: outputUpload, error: outputError } = await admin.storage
+      .from("headshots")
+      .upload(outputStoragePath, outputBuffer, {
+        contentType: "image/png",
+        upsert: false,
+      })
+
+    if (outputError) {
+      throw new Error("Failed to upload result to storage")
+    }
 
     // Save to database
     const { data: headshot, error: headshotError } = await supabase
@@ -183,7 +198,8 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: user.id,
         order_id: orderId,
-        image_url: outputBlob.pathname,
+        storage_path: outputStoragePath,
+        style,
         status: "completed",
       })
       .select()
@@ -196,7 +212,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       id: headshot.id,
-      pathname: outputBlob.pathname,
+      storage_path: outputStoragePath,
       promptId,
       style,
     })

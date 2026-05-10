@@ -134,18 +134,18 @@ export default async function DashboardPage() {
                         key={headshot.id}
                         className="group relative aspect-[3/4] overflow-hidden rounded-lg bg-muted"
                       >
-                        {headshot.image_url ? (
+                        {headshot.storage_path ? (
                           <>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
-                              src={`/api/file?pathname=${encodeURIComponent(headshot.image_url)}`}
+                              src={`/api/file?pathname=${encodeURIComponent(headshot.storage_path)}`}
                               alt="AI Headshot"
                               className="h-full w-full object-cover"
                             />
                             <div className="absolute inset-0 flex items-center justify-center bg-background/80 opacity-0 transition-opacity group-hover:opacity-100">
                               <Button size="sm" variant="secondary" asChild>
                                 <a
-                                  href={`/api/download?pathname=${encodeURIComponent(headshot.image_url)}&filename=headshot-${headshot.id}.jpg`}
+                                  href={`/api/download?pathname=${encodeURIComponent(headshot.storage_path)}&filename=headshot-${headshot.id}.jpg`}
                                   download
                                 >
                                   <Download className="mr-2 h-4 w-4" />

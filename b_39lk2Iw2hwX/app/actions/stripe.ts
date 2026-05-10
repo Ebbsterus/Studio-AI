@@ -37,7 +37,7 @@ export async function createCheckoutSession(productId: string) {
   }
 
   const session = await stripe.checkout.sessions.create({
-    ui_mode: "embedded",
+    ui_mode: "embedded" as any,
     payment_method_types: ["card"],
     line_items: [
       {

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { get } from "@vercel/blob"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,22 +19,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify user owns this file
-    if (!pathname.includes(user.id)) {
+    if (!pathname.startsWith(`${user.id}/`)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
-    const result = await get(pathname, {
-      access: "private",
-    })
+    const admin = createAdminClient()
+    const { data: blob, error } = await admin.storage
+      .from("headshots")
+      .download(pathname)
 
-    if (!result) {
+    if (error || !blob) {
       return new NextResponse("Not found", { status: 404 })
     }
 
-    // Return with Content-Disposition header for download
-    return new NextResponse(result.stream, {
+    const arrayBuffer = await blob.arrayBuffer()
+
+    return new NextResponse(arrayBuffer, {
       headers: {
-        "Content-Type": result.blob.contentType,
+        "Content-Type": blob.type || "image/jpeg",
         "Content-Disposition": `attachment; filename="${filename}"`,
       },
     })
