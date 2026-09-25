@@ -19,7 +19,8 @@ GitHub. These rules keep the two from colliding.
 ## Handoff
 
 - End each piece of work with a pushed `claude/...` branch and a short summary of what changed and why.
-- The owner reviews on the PC with a separate worktree, e.g. `git worktree add ../studio-ai-claude claude/<branch>`, and merges what they want.
+- The owner reviews on the PC with a separate worktree and merges what they want. Fetch first, or the new branch is unknown locally:
+  `git fetch origin` then `git worktree add ../studio-ai-claude claude/<branch>` (git creates the local branch tracking `origin/claude/<branch>`).
 
 ## Safety
 
